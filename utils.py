@@ -1,6 +1,7 @@
 import librosa
 from IPython.display import Audio, display
 import torch
+import torchaudio
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -68,20 +69,26 @@ def reverbrate(waveforms, rir, preprocess = False):
         # Cut from after peak
         rir = rir[direct_index:]
 
+    # Source length
+    source_len = waveforms.shape[0]
+
     # Normalize remaining
     rir = rir / torch.norm(rir, p=2) # Mean square
 
+    # NOTE: THIS ALL NOT NEEDED for fftconvolve
     # Flip for convolution (we are adding previous values (aka "echo") for each point
-    rir = torch.flip(rir,[0])
+    # rir = torch.flip(rir,[0])
 
     # Pad with zeros to match output time
-    waveforms = torch.cat((torch.zeros(rir.shape[0]-1,dtype=waveforms.dtype), waveforms), 0)
+    # waveforms = torch.cat((torch.zeros(rir.shape[0]-1,dtype=waveforms.dtype), waveforms), 0)
 
     # Calculate convolution
     waveforms = waveforms.unsqueeze(0).unsqueeze(0)
     rir = rir.unsqueeze(0).unsqueeze(0)
-    waveforms = torch.nn.functional.conv1d(waveforms, rir)
+    # waveforms = torch.nn.functional.conv1d(waveforms, rir)
+    waveforms = torchaudio.functional.fftconvolve(waveforms, rir)
     waveforms = waveforms.squeeze(dim=0).squeeze(dim=0)
+    waveforms = waveforms[0:source_len]
 
     return waveforms
 
