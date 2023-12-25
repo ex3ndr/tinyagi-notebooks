@@ -1,6 +1,7 @@
 import random
 from .utils import SAMPLE_RATE, load_audio, reverbrate, sound_detector, smooth_sound_detector
 import torch
+import torchaudio
 import torchaudio.functional as F
 
 def select_random_segment(source, length):
@@ -54,6 +55,9 @@ def add_audio_noise(waveforms, noise, snr):
 
 def synthesize_sample(duration, 
                       
+                      # Effector for result
+                      effector = None,
+                      
                       # Background
                       background = None, 
                       background_snr = 10, # Safe default
@@ -62,7 +66,7 @@ def synthesize_sample(duration,
                       clean = None, 
                       clean_treshold = 0.01,
                       clean_smooth = 5, # Default for half of the input sequence or ~100ms
-                      clean_effector = None,
+                      clean_tempo = None,
 
                       # RIR
                       rir = None):
@@ -78,6 +82,12 @@ def synthesize_sample(duration,
 
         # Load source audio and detect voice
         clean = load_audio(clean)
+
+        # Speed up or slow down
+        if clean_tempo is not None:
+            clean = torchaudio.io.AudioEffector(effect=f'atempo={clean_tempo}').apply(clean.unsqueeze(0).T, SAMPLE_RATE).T[0]
+
+        # Detect voice
         detected_voice = sound_detector(clean, 320, clean_treshold)
         detected_voice = smooth_sound_detector(detected_voice, clean_smooth)
 
@@ -88,16 +98,17 @@ def synthesize_sample(duration,
             rir = load_audio(rir)
             clean = reverbrate(clean, rir)
 
-        # Apply effector
-        if clean_effector is not None:
-            clean = clean_effector.apply(clean)
-
         # Add audio chunk
         add_audio_chunk(waveforms, labels, clean, detected_voice)
 
         # Apply background noise
         if background is not None:
             waveforms = add_audio_noise(waveforms, background, background_snr)
+
+        # Apply effector after everything to simluate everything
+        if effector is not None:
+            waveforms = effector.apply(waveforms.unsqueeze(0).T, SAMPLE_RATE).T[0]
+
     else:
         # No clean sound: add background as is
         if background is not None:

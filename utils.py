@@ -34,7 +34,7 @@ def get_dataset_path(name):
     
 def load_audio(pathOrTensor):
     if isinstance(pathOrTensor, str):
-        y, _ = librosa.load(pathOrTensor, sr=SAMPLE_RATE) # I have found that torchaudio sometimes can't open some wav files
+        y, _ = librosa.load(pathOrTensor, sr=SAMPLE_RATE, mono=True) # I have found that torchaudio sometimes can't open some wav files
         return torch.from_numpy(y)
     else:
         return pathOrTensor
